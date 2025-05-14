@@ -85,18 +85,18 @@ function parseScope(scope: string) {
   }
   const maybeConfigurableScope = rawConfigurableScope.safeParse(scope)
   if (maybeConfigurableScope.success) {
-    const parsedScope = maybeConfigurableScope.data
-    const [, type, rawOptions] = parsedScope.match(rawConfigurableScopeRegex) ?? []
+    const rawScope = maybeConfigurableScope.data
+    const [, type, rawOptions] = rawScope.match(rawConfigurableScopeRegex) ?? []
     const options = rawOptions.split(',').reduce((acc, option) => {
       const [key, value] = option.split('=')
       acc[key] = value.split('|')
       return acc
     }, {} as Record<string, string[]>)
-    const genericScope = {
+    const parsedScope = {
       type,
       options
     }
-    const result = ConfigurableScopes.safeParse(genericScope)
+    const result = ConfigurableScopes.safeParse(parsedScope)
     if (result.success) {
       return result.data
     }
