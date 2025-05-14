@@ -64,10 +64,9 @@ const literalScopes = z.literal([
 ])
 
 const userRoleRegex = /role=([a-zA-Z0-9_]+)(\|[a-zA-Z0-9_]+)*/
+const userCreateRoleRegex = /user.create\[role=([a-zA-Z0-9_]+)(\|[a-zA-Z0-9_]+)*\]/
 
-const roleScope = z.templateLiteral(['user.create[', z.string().regex(userRoleRegex), ']'])
-
-const rawScopes = (z.union([literalScopes, roleScope]))
+const roleScope = z.string().regex(userCreateRoleRegex)
 
 function parseScope(scope: string) {
   const maybeRoleScope = roleScope.safeParse(scope)
@@ -75,7 +74,7 @@ function parseScope(scope: string) {
     const parsedScope = maybeRoleScope.data
     const [, rolesString] = parsedScope.match(userRoleRegex) ?? []
     return {
-      type: 'user.create',
+      type: 'user.create' as const,
       options: {
         roles: rolesString.split('|')
       }
@@ -90,6 +89,6 @@ function parseScope(scope: string) {
 }
 
 export type ParsedScopes = NonNullable<ReturnType<typeof parseScope>>
-export type RawScopes = z.infer<typeof rawScopes>
+export type RawScopes = z.infer<typeof literalScopes> | `user.create[${string}]]`
 
 console.log(parseScope('user.create[role=admin|super_admin]'))
