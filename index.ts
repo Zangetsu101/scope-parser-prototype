@@ -63,32 +63,47 @@ const literalScopes = z.literal([
   'user.data-seeding'
 ])
 
-const userRoleRegex = /role=([a-zA-Z0-9_]+)(\|[a-zA-Z0-9_]+)*/
-const userCreateRoleRegex = /user.create\[role=([a-zA-Z0-9_]+)(\|[a-zA-Z0-9_]+)*\]/
+const rawConfigurableScopeRegex = /^([a-zA-Z]+\.[a-zA-Z]+)\[((?:\w+=\w+(?:\|\w+)*)(:?,\w+=\w+(?:\|\w+)*)*)\]$/
 
-const roleScope = z.string().regex(userCreateRoleRegex)
+const rawConfigurableScope = z.string().regex(rawConfigurableScopeRegex)
+
+const CreateUser = z.object({
+  type: z.literal('user.create'),
+  options: z.object({
+    role: z.array(z.string())
+  })
+})
+
+const ConfigurableScopes = z.union([CreateUser])
 
 function parseScope(scope: string) {
-  const maybeRoleScope = roleScope.safeParse(scope)
-  if (maybeRoleScope.success) {
-    const parsedScope = maybeRoleScope.data
-    const [, rolesString] = parsedScope.match(userRoleRegex) ?? []
-    return {
-      type: 'user.create' as const,
-      options: {
-        roles: rolesString.split('|')
-      }
-    }
-  }
   const maybeLiteralScope = literalScopes.safeParse(scope)
   if (maybeLiteralScope.success) {
     return {
       type: maybeLiteralScope.data
     }
   }
+  const maybeConfigurableScope = rawConfigurableScope.safeParse(scope)
+  if (maybeConfigurableScope.success) {
+    const parsedScope = maybeConfigurableScope.data
+    const [, type, rawOptions] = parsedScope.match(rawConfigurableScopeRegex) ?? []
+    const options = rawOptions.split(',').reduce((acc, option) => {
+      const [key, value] = option.split('=')
+      acc[key] = value.split('|')
+      return acc
+    }, {} as Record<string, string[]>)
+    const genericScope = {
+      type,
+      options
+    }
+    const result = ConfigurableScopes.safeParse(genericScope)
+    if (result.success) {
+      return result.data
+    }
+  }
 }
 
 export type ParsedScopes = NonNullable<ReturnType<typeof parseScope>>
-export type RawScopes = z.infer<typeof literalScopes> | `user.create[${string}]]`
+export type RawScopes = z.infer<typeof literalScopes> | string & {}
 
 console.log(parseScope('user.create[role=admin|super_admin]'))
